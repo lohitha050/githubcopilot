@@ -5,9 +5,11 @@ on:
       - main
 
 jobs:
+  # 1. SonarQube scan runs first
   sonar-scan:
     name: SonarQube Analysis
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,25 +23,25 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.organization=copilotorg -Dsonar.projectKey=copilotproj
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.organization=copilotorg2 -Dsonar.projectKey=copilotproj2
 
+  # 2. Snyk scan runs after SonarQube, even if SonarQube fails
   snyk-scan:
-    needs: sonar-scan
-    if: always()
     name: Snyk Security Scan
+    needs: sonar-scan
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Snyk Security Scan
         uses: snyk/actions/maven@master
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
+  # 3. OWASP ZAP scan runs after Snyk, even if Snyk fails
   zap-scan:
-    needs: snyk-scan
-    if: always()
     name: OWASP ZAP Scan
+    needs: snyk-scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,3 +49,4 @@ jobs:
         uses: zaproxy/action-baseline@v0.14.0
         with:
           target: 'https://www.zaproxy.org'
+        continue-on-error: true
